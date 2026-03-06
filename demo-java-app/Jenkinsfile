@@ -51,33 +51,39 @@ pipeline {
             }
         }
 
-        // === QUALITÉ - SonarQube (optionnel) ===
+        // === QUALITÉ - SonarQube ===
         stage('Qualité - Analyse SonarQube') {
-            when {
-                expression { return false }
-            }
             steps {
                 withSonarQubeEnv('SonarQube') {
                     dir('demo-java-app') {
-                        sh 'mvn sonar:sonar -Dsonar.projectKey=${APP_NAME}'
+                        sh 'mvn sonar:sonar -Dsonar.projectKey=${APP_NAME} -Dsonar.host.url=${SONAR_URL}'
                     }
                 }
                 timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
+                    waitForQualityGate abortPipeline: false
                 }
             }
         }
 
-        // === SÉCURITÉ ===
+        // === SÉCURITÉ : scan des vulnérabilités dans les dépendances (pom.xml) ===
         stage('Sécurité - Analyse dépendances') {
             steps {
-                sh 'echo "== Analyse de sécurité des dépendances (OWASP Dependency-Check) =="'
+                dir('demo-java-app') {
+                    sh 'mvn org.owasp:dependency-check-maven:check -DfailOnError=false -Dformat=HTML -q'
+                }
             }
         }
 
+        // === SÉCURITÉ : scan de l'image Docker (dans un setup complet) ===
         stage('Sécurité - Scan image Docker') {
             steps {
-                sh 'echo "== Scan image Docker (Trivy, Docker Scout) =="'
+                sh '''
+                  echo "=== Scan de sécurité des images Docker ==="
+                  echo "Dans un pipeline complet : après 'docker build', on exécuterait :"
+                  echo "  trivy image --severity HIGH,CRITICAL mon-image:tag"
+                  echo "  ou : docker scout cves mon-image:tag"
+                  echo "Ici : pas de build Docker (agent any), cette étape documente le processus."
+                '''
             }
         }
     }
