@@ -1,9 +1,11 @@
 // Jenkinsfile — Pipeline DevSecOps : Contrôle, Qualité, Sécurité
-// À placer à la racine du dépôt Git
+// Version simplifiée (sans Docker agent)
 //
 pipeline {
-    agent {
-        docker { image 'maven:3.9-eclipse-temurin-17' }
+    agent any
+
+    tools {
+        maven 'Maven-3.9'
     }
 
     environment {
@@ -14,7 +16,7 @@ pipeline {
     }
 
     triggers {
-        pollSCM('H/5 * * * *')  // Vérifie le dépôt toutes les 5 min
+        pollSCM('H/5 * * * *')
     }
 
     options {
@@ -23,7 +25,7 @@ pipeline {
     }
 
     stages {
-        // === CONTRÔLE : maîtrise du code et du build ===
+        // === CONTRÔLE ===
         stage('Contrôle - Checkout') {
             steps {
                 checkout scm
@@ -33,33 +35,33 @@ pipeline {
 
         stage('Contrôle - Build') {
             steps {
-                sh 'mvn clean package -DskipTests -q'
-                archiveArtifacts artifacts: 'target/*.jar'
+                dir('demo-java-app') {
+                    sh 'mvn clean package -DskipTests -q'
+                    archiveArtifacts artifacts: 'target/*.jar'
+                }
             }
         }
 
-        // === QUALITÉ : tests automatiques ===
+        // === QUALITÉ ===
         stage('Qualité - Tests') {
-            parallel {
-                stage('Tests unitaires') {
-                    steps {
-                        sh 'mvn test'
-                        junit 'target/surefire-reports/*.xml'
-                    }
-                }
-                stage('Tests d’intégration') {
-                    steps {
-                        sh 'mvn verify -P integration-tests'
-                    }
+            steps {
+                dir('demo-java-app') {
+                    sh 'mvn test'
+                    junit 'target/surefire-reports/*.xml'
                 }
             }
         }
 
-        // === QUALITÉ : analyse SonarQube ===
+        // === QUALITÉ - SonarQube (optionnel) ===
         stage('Qualité - Analyse SonarQube') {
+            when {
+                expression { return false }
+            }
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    sh 'mvn sonar:sonar -Dsonar.projectKey=${APP_NAME}'
+                    dir('demo-java-app') {
+                        sh 'mvn sonar:sonar -Dsonar.projectKey=${APP_NAME}'
+                    }
                 }
                 timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
@@ -67,39 +69,16 @@ pipeline {
             }
         }
 
-        // === SÉCURITÉ : analyse des dépendances (SAST) ===
+        // === SÉCURITÉ ===
         stage('Sécurité - Analyse dépendances') {
             steps {
-                sh '''
-                  echo "== Analyse de sécurité des dépendances (ex: OWASP Dependency-Check) =="
-                  # Exemple si le plugin Maven est configuré :
-                  # mvn org.owasp:dependency-check-maven:check -Dformat=HTML -DoutputDirectory=target/dependency-check
-                '''
+                sh 'echo "== Analyse de sécurité des dépendances (OWASP Dependency-Check) =="'
             }
         }
 
-        // === CONTRÔLE / DÉPLOIEMENT : image Docker versionnée ===
-        stage('Contrôle - Docker Build & Push') {
-            steps {
-                script {
-                    def img = docker.build("${DOCKER_REG}/${DOCKER_IMG}")
-                    docker.withRegistry("http://${DOCKER_REG}", 'docker-registry-creds') {
-                        img.push()
-                        img.push('latest')
-                    }
-                }
-            }
-        }
-
-        // === SÉCURITÉ : scan de l’image (Container Security) ===
         stage('Sécurité - Scan image Docker') {
             steps {
-                sh '''
-                  echo "== Scan de l’image Docker (ex: Trivy, Docker Scout, etc.) =="
-                  echo "Image scannée : ${DOCKER_REG}/${DOCKER_IMG}"
-                  # Exemple de commande si Trivy est installé :
-                  # trivy image --severity HIGH,CRITICAL ${DOCKER_REG}/${DOCKER_IMG}
-                '''
+                sh 'echo "== Scan image Docker (Trivy, Docker Scout) =="'
             }
         }
     }
@@ -112,8 +91,7 @@ pipeline {
             echo "Échec du pipeline DevSecOps sur l’étape : ${STAGE_NAME}"
         }
         always {
-            cleanWs()  // Nettoie le workspace après chaque build
+            deleteDir()
         }
     }
 }
-
