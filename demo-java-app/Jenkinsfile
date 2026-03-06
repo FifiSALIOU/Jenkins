@@ -47,7 +47,6 @@ pipeline {
             steps {
                 dir('demo-java-app') {
                     sh 'mvn test'
-                    junit 'target/surefire-reports/*.xml'
                 }
             }
         }
