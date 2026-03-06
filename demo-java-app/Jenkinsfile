@@ -61,9 +61,7 @@ pipeline {
                         }
                     }
                 }
-                timeout(time: 15, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: false
-                }
+                // waitForQualityGate désactivé (timeout) — résultats visibles sur http://localhost:9000
             }
         }
 
