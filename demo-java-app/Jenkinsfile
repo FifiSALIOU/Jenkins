@@ -54,9 +54,9 @@ pipeline {
         // === QUALITÉ - SonarQube ===
         stage('Qualité - Analyse SonarQube') {
             steps {
-                withSonarQubeEnv('SonarQube') {
+                withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
                     dir('demo-java-app') {
-                        sh 'mvn sonar:sonar -Dsonar.projectKey=${APP_NAME} -Dsonar.host.url=${SONAR_URL}'
+                        sh 'mvn sonar:sonar -Dsonar.projectKey=${APP_NAME} -Dsonar.host.url=${SONAR_URL} -Dsonar.token=${SONAR_TOKEN}'
                     }
                 }
                 timeout(time: 5, unit: 'MINUTES') {
