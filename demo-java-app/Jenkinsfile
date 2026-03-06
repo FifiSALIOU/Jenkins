@@ -8,14 +8,13 @@ pipeline {
 
     environment {
         APP_NAME    = 'myapp'
-        // Registry local défini dans docker-compose.yml
         DOCKER_REG  = 'registry:5000'
         DOCKER_IMG  = "${APP_NAME}:${BUILD_NUMBER}"
         SONAR_URL   = 'http://sonarqube:9000'
     }
 
     triggers {
-        githubPush()  // Déclenchement automatique sur push
+        pollSCM('H/5 * * * *')  // Vérifie le dépôt toutes les 5 min
     }
 
     options {
